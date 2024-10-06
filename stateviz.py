@@ -1,34 +1,47 @@
 #!/usr/bin/env python
 
 from __future__ import annotations
+from typing import Callable
+
 
 class Node:
-    def __init__(self, f):
+    def __init__(self, f: Callable, *children_names: list[str]):
         self.f = f
+        self.children_names = children_names
+        self.children = {}
+        self.resolved = False
+
+    def run(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def resolve(self, d):
+        if self.resolved:
+            raise Exception(f"node {self} is already resolved. Loop detected?")
+
+        for child_name in self.children_names:
+            child = d[child_name]
+            child.resolve(d)
+            self.children[child_name] = child
+
+        self.resolved = True
+
+    def __repr__(self):
+        return f"{self.f.__name__}({self.children})"
 
 
 """
 TODO:
-- indicate loops
 - indicate unvisited nodes
 """
 
 
 class Then(Node):
     def __init__(self, f, next):
-        self.f = f
-        self.next = next
-
-    def resolve(self, d):
-        self.next = d[self.next]
-        self.next.resolve(d)
+        super().__init__(f, next)
 
     def run(self, *args):
         result = self.f(*args)
-        return self.next.run(result)
-
-    def __repr__(self):
-        return f"{self.f.__name__}({self.next})"
+        return self.children[self.children_names[0]].run(result)
 
 
 class End(Node):
@@ -101,4 +114,4 @@ def end(arg: str) -> str:
 
 state.resolve()
 print(state._root)
-state.run('XOXOXO')
+state.run("XOXOXO")
